@@ -20,7 +20,7 @@ SOURCE_CHANNELS = [
 CONVERTOR_BOT = 'ekconverter16bot' 
 
 # 3. ⚠️ AAPKA APNA CHANNEL: Jahan deals post hoti hain (Bina @ ke username daalein)
-MY_TARGET_CHANNEL = 'SixtyStore_Deals' 
+MY_TARGET_CHANNEL = 'SixtyStore_loot' 
 
 # 4. 🔥 APNA BRAND LINK: Jo har post ke end mein automatic judega
 MY_BRAND_FOOTER = "\n\nJoin for more premium loots ❤️👇\nhttps://t.me/sixtystore_loot"
