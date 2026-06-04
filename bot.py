@@ -1,6 +1,6 @@
 import os
 import threading
-from http.server import SimpleHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from telethon import TelegramClient, events
 
 # ==========================================
@@ -20,7 +20,7 @@ SOURCE_CHANNELS = [
 CONVERTOR_BOT = 'ekconverter16bot' 
 
 # 3. ⚠️ AAPKA APNA CHANNEL: Jahan deals post hoti hain (Bina @ ke username daalein)
-MY_TARGET_CHANNEL = 'SixtyStore_loot' 
+MY_TARGET_CHANNEL = 'SixtyStore_Deals' 
 
 # 4. 🔥 APNA BRAND LINK: Jo har post ke end mein automatic judega
 MY_BRAND_FOOTER = "\n\nJoin for more premium loots ❤️👇\nhttps://t.me/sixtystore_loot"
@@ -69,11 +69,24 @@ async def auto_edit_handler(event):
             print(f"❌ Channel post edit karne mein error: {e}\n")
 
 # ==========================================
-# 🌍 DUMMY SERVER FOR RENDER FREE TIER
+# 🌍 DUMMY SERVER WITH TINY RESPONSE FOR CRON-JOB
 # ==========================================
+class TinyRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # Jab bhi cron-job hit karega, sirf 200 OK aur chhota sa text bhejega
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"Bot is awake!")
+
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+
 def run_dummy_server():
     port = int(os.environ.get("PORT", 8000))
-    server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
+    # TinyRequestHandler use karenge taaki cron-job par output too large na aaye
+    server = HTTPServer(('0.0.0.0', port), TinyRequestHandler)
     print(f"🌍 Dummy web server running on port {port}")
     server.serve_forever()
 
