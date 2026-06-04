@@ -13,7 +13,7 @@ SOURCE_CHANNELS = [
 
 CONVERTOR_BOT = 'ekconverter16bot' 
 
-client = TelegramClient('instant_middleman_session', API_ID, API_HASH)
+client = TelegramClient('forwarder_session', API_ID, API_HASH)
 
 @client.on(events.NewMessage(chats=SOURCE_CHANNELS))
 async def instant_forward_handler(event):
