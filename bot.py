@@ -157,4 +157,4 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 client.start()
-client.run_disconnected()
+client.run_until_disconnected()
