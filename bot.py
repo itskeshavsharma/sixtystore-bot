@@ -15,6 +15,9 @@ CONVERTOR_BOT = 'ekconverter16bot'
 MY_TARGET_CHANNEL = 'SixtyStore_loot' 
 MY_BRAND_FOOTER = "\n\nJoin for more premium loots ❤️👇\nhttps://t.me/sixtystore_loot"
 
+# 🧠 PRO-LOOP PROTECTION: Jo messages edit ho chuke hain, unki ID yahan save hogi
+PROCESSED_MESSAGES = set()
+
 # ==========================================
 # 🤖 BOT INITIALIZATION
 # ==========================================
@@ -42,88 +45,80 @@ async def auto_logo_handler(event):
     if not event.message:
         return
 
-    # Agar message mein photo nahi hai, toh sirf text edit karke chhod do
-    if not event.message.media:
-        if event.message.message and "https://t.me/sixtystore_loot" not in event.message.message:
-            try:
-                await client.edit_message(event.chat_id, event.message.id, event.message.message + MY_BRAND_FOOTER)
-                print("📝 [TEXT ONLY] Footer link edit ho gayi.")
-            except Exception as e:
-                print(f"❌ Text edit error: {e}")
+    # 🛑 1. ID CHECK: Agar ye message humne pehle process kiya hai toh turant ruk jao
+    if event.message.id in PROCESSED_MESSAGES:
         return
 
-    print("📸 Channel par photo wala post aaya! Double logo processing chalu...")
     original_text = event.message.message or ""
     
-    # Loop protection tag
-    if "[BRANDED]" in original_text:
+    # 🛑 2. TEXT CHECK: Agar footer pehle se maujood hai toh bhi ruk jao
+    if "https://t.me/sixtystore_loot" in original_text:
         return
 
+    # Message ID ko processed list mein daal do taaki loop na bane
+    PROCESSED_MESSAGES.add(event.message.id)
+
+    # 📝 CASE A: AGAR PURE TEXT MESSAGE HAI (Bina Photo Ke)
+    if not event.message.media:
+        try:
+            updated_text = original_text + MY_BRAND_FOOTER
+            await client.edit_message(event.chat_id, event.message.id, updated_text)
+            print("📝 [SUCCESS] Pure text post par footer link jod di gayi!\n")
+        except Exception as e:
+            print(f"❌ Text edit karne mein error: {e}\n")
+        return
+
+    # 📸 CASE B: AGAR PHOTO WALA MESSAGE HAI
+    print("📸 Channel par photo wala post aaya! Double logo processing chalu...")
     try:
-        # 1. Original photo download karo
+        # Photo download karo
         photo_path = await event.message.download_media()
-        print("✅ Original photo downloaded.")
-
-        # Main deal image ko open karo
         base_img = Image.open(photo_path).convert("RGBA")
-        img_w, img_h = base_img.size  # Base image ka dynamic width aur height
+        img_w, img_h = base_img.size
 
-        # ------------------------------------------
-        # 🟢 PART A: TOP-LEFT LOGO PLACEMENT
-        # ------------------------------------------
+        # Top-Left Logo placement
         if os.path.exists("logo.png"):
             logo_img = Image.open("logo.png").convert("RGBA")
-            
-            # 📐 Aapke logo ka size (Aapke screenshot ke hisab se perfect 110x110)
             logo_img = logo_img.resize((110, 110)) 
-            
-            # 📍 Coordinates: Unke logo ko cover karne ke liye bilkul top-left corner par
             logo_position = (15, 15)
-            
             base_img.paste(logo_img, logo_position, logo_img)
             print("🎨 Top-Left Logo successfully pasted!")
-        else:
-            print("⚠️ logo.png nahi mili, step skip kiya.")
 
-        # ------------------------------------------
-        # 🟢 PART B: BOTTOM-CENTER STRIP PLACEMENT
-        # ------------------------------------------
+        # Bottom-Center Strip placement
         if os.path.exists("footer_strip.png"):
             strip_img = Image.open("footer_strip.png").convert("RGBA")
-            
-            # 📐 Strip ka size (Width: 190, Height: 45) - Ise aavashyaktanusar chhota-bada kar sakte hain
             strip_w, strip_h = 190, 45
             strip_img = strip_img.resize((strip_w, strip_h))
             
-            # 📍 Logic: Dynamic coordinates taaki strip hamesha niche center mein hi baithe
             strip_x = int((img_w - strip_w) / 2)
-            strip_y = int(img_h - strip_h - 15)  # Niche se 15 pixels upar
+            strip_y = int(img_h - strip_h - 15)
             
             base_img.paste(strip_img, (strip_x, strip_y), strip_img)
             print("🎨 Bottom Footer Strip successfully pasted!")
-        else:
-            print("⚠️ footer_strip.png nahi mili, step skip kiya.")
 
-        # Final conversion aur save
+        # Save edited image
         base_img = base_img.convert("RGB")
         base_img.save("edited_photo.jpg")
         photo_to_send = "edited_photo.jpg"
 
-        # 3. Purana unbranded message delete karo
+        # Purana bina logo wala post delete karo
         await client.delete_messages(event.chat_id, event.message.id)
         print("🗑️ Old post deleted.")
 
-        # 4. Apna branded post upload karo
-        final_text = original_text + MY_BRAND_FOOTER + "\n"
-        await client.send_file(MY_TARGET_CHANNEL, photo_to_send, caption=final_text)
+        # Naya customized post bhejdo (Footer link ke sath)
+        final_text = original_text + MY_BRAND_FOOTER
+        
+        # Naya message send karte waqt use processed mein add karenge taaki delete loop na bane
+        sent_msg = await client.send_file(MY_TARGET_CHANNEL, photo_to_send, caption=final_text)
+        PROCESSED_MESSAGES.add(sent_msg.id)
         print("💥 [SUCCESS] Double watermarked post successfully uploaded!\n")
 
-        # Temporary files safai
+        # Safai
         if os.path.exists(photo_path): os.remove(photo_path)
         if os.path.exists("edited_photo.jpg"): os.remove("edited_photo.jpg")
 
     except Exception as e:
-        print(f"❌ Processing error: {e}\n")
+        print(f"❌ Photo processing error: {e}\n")
 
 # ==========================================
 # 🌍 DUMMY SERVER WITH TINY RESPONSE FOR CRON-JOB
