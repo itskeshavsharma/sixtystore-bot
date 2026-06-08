@@ -198,7 +198,7 @@ async def instant_forward_handler(event):
         print(f"❌ Forward karne mein error: {e}\n")
 
 # ------------------------------------------
-# 🎯 STEP 2: SMART VISION WATERMARKER & RE-POSTER
+# 🎯 STEP 2: SMART VISION WATERMARKER (Sirf 2 Logos)
 # ------------------------------------------
 @client.on(events.NewMessage(chats=MY_TARGET_CHANNEL))
 async def auto_logo_handler(event):
@@ -233,28 +233,26 @@ async def auto_logo_handler(event):
         # Photo download karo
         photo_path = await event.message.download_media()
         
-        # 🧠 COMPUTER VISION LOGIC: Check karo kya LootsVault ka logo image mein hai?
+        # 🧠 COMPUTER VISION: Check karo kya unka logo image mein hai?
         has_logo = False
         if os.path.exists("target_watermark.png"):
-            # Main image aur template image dono ko load karo gray color mein
             main_img_cv = cv2.imread(photo_path, cv2.IMREAD_GRAYSCALE)
             template_cv = cv2.imread("target_watermark.png", cv2.IMREAD_GRAYSCALE)
             
             if main_img_cv is not None and template_cv is not None:
-                # Template matching algorithm chalao
                 result = cv2.matchTemplate(main_img_cv, template_cv, cv2.TM_CCOEFF_NORMED)
                 _, max_val, _, _ = cv2.minMaxLoc(result)
                 
-                print(f"🔍 Image Match Score: {max_val:.2f} (Humein kam se kam 0.70 chahiye)")
-                # 0.70 ka matlab hai 70% matching accuracy. Isse logo pakada jayega.
-                if max_val >= 0.70:
+                print(f"🔍 Image Match Score: {max_val:.2f} (Humein kam se kam 0.60 chahiye)")
+                # Threshold thoda kam kar diya hai taaki match aasani se pakad sake
+                if max_val >= 0.60:
                     has_logo = True
         else:
             print("⚠️ target_watermark.png file nahi mili! Matching skip ho gayi.")
 
-        # 🚫 AGAR LOGO NAHI MILA: Toh photo ko bina chhede sirf link edit karke chod do!
+        # 🚫 LOGO NAHI MILA: Toh photo ko bina chhede sirf link edit karke chod do!
         if not has_logo:
-            print("⏩ LootsVault ka logo nahi mila. Photo edit SKIP ki ja rahi hai.")
+            print("⏩ Target logo nahi mila. Photo edit SKIP ki ja rahi hai.")
             try:
                 updated_text = original_text + MY_BRAND_FOOTER
                 await client.edit_message(event.chat_id, event.message.id, updated_text)
@@ -264,19 +262,20 @@ async def auto_logo_handler(event):
             if os.path.exists(photo_path): os.remove(photo_path)
             return
 
-        # 🎯 AGAR LOGO MIL GAYA: Toh teeno logo chipkao aur re-post karo!
-        print("🎯 MATCH FOUND! LootsVault ka logo detected. Logo editing chalu...")
+        # 🎯 LOGO MIL GAYA: Toh sirf 2 logo lagao aur re-post karo!
+        print("🎯 MATCH FOUND! Logo detected. Sirf 2 logo lagaye ja rahe hain...")
         base_img = Image.open(photo_path).convert("RGBA")
         img_w, img_h = base_img.size
 
-        # 1️⃣ Top-Left Logo placement
+        # 1️⃣ Image 1: Top-Left Logo placement
         if os.path.exists("logo.png"):
             logo_img = Image.open("logo.png").convert("RGBA")
             logo_img = logo_img.resize((110, 110)) 
             logo_position = (15, 15)
             base_img.paste(logo_img, logo_position, logo_img)
+            print("🎨 Top-Left Logo pasted.")
 
-        # 2️⃣ Bottom-Center Strip placement
+        # 2️⃣ Image 2: Bottom-Center Strip placement
         if os.path.exists("footer_strip.png"):
             strip_img = Image.open("footer_strip.png").convert("RGBA")
             strip_w, strip_h = 190, 45
@@ -284,17 +283,9 @@ async def auto_logo_handler(event):
             strip_x = int((img_w - strip_w) / 2)
             strip_y = int(img_h - strip_h - 15)
             base_img.paste(strip_img, (strip_x, strip_y), strip_img)
+            print("🎨 Bottom Footer Strip pasted.")
 
-        # 3️⃣ Center Solid White + Black Logo placement
-        if os.path.exists("center_watermark.png"):
-            center_w_img = Image.open("center_watermark.png").convert("RGBA")
-            wm_size = int(img_w * 0.45)
-            center_w_img = center_w_img.resize((wm_size, wm_size))
-            wm_x = int((img_w - wm_size) / 2)
-            wm_y = int((img_h - wm_size) / 2)
-            base_img.paste(center_w_img, (wm_x, wm_y), center_w_img)
-
-        # Save and send
+        # Save and send (Center wala sab hata diya hai)
         base_img = base_img.convert("RGB")
         base_img.save("edited_photo.jpg")
         
@@ -302,7 +293,7 @@ async def auto_logo_handler(event):
         final_text = original_text + MY_BRAND_FOOTER
         sent_msg = await client.send_file(MY_TARGET_CHANNEL, "edited_photo.jpg", caption=final_text)
         PROCESSED_MESSAGES.add(sent_msg.id)
-        print("💥 [SUCCESS] Smart Vision post uploaded successfully!\n")
+        print("💥 [SUCCESS] 2-Logo watermarked post uploaded successfully!\n")
 
         if os.path.exists(photo_path): os.remove(photo_path)
         if os.path.exists("edited_photo.jpg"): os.remove("edited_photo.jpg")
