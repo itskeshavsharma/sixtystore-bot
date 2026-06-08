@@ -1,2 +1,3 @@
 telethon
 Pillow
+opencv-python-headless
