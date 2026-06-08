@@ -10,15 +10,10 @@ from PIL import Image
 API_ID = int(os.environ.get("API_ID", 1234567))  
 API_HASH = os.environ.get("API_HASH", "placeholder_hash")
 
-# SOURCE_CHANNELS jahan se bot forward karega
-SOURCE_CHANNELS = ['BhramsBots1','megadealv1', 'pocket_tv_mod_app'] 
+SOURCE_CHANNELS = ['megadealv1', 'pocket_tv_mod_app'] 
 CONVERTOR_BOT = 'ekconverter16bot' 
 MY_TARGET_CHANNEL = 'SixtyStore_loot' 
 MY_BRAND_FOOTER = "\n\nJoin for more premium loots ❤️👇\nhttps://t.me/sixtystore_loot"
-
-# 🎯 JIS CHANNEL KE POST PAR LOGO LAGANA HAI (Username bina @ ke daalein)
-# Agar megadealv1 hi LootsVault ka source hai, toh isko aise hi rehne dein
-LOGO_ONLY_SOURCE_CHANNEL = 'BhramsBots1' 
 
 # 🧠 LOOP PROTECTION TRACKER
 PROCESSED_MESSAGES = set()
@@ -43,7 +38,7 @@ async def instant_forward_handler(event):
         print(f"❌ Forward karne mein error: {e}\n")
 
 # ------------------------------------------
-# 🎯 STEP 2: LOGO WATERMARKER & RE-POSTER (With Source Check)
+# 🎯 STEP 2: OPEN PHOTO WATERMARKER & RE-POSTER (No Filters)
 # ------------------------------------------
 @client.on(events.NewMessage(chats=MY_TARGET_CHANNEL))
 async def auto_logo_handler(event):
@@ -62,39 +57,25 @@ async def auto_logo_handler(event):
 
     PROCESSED_MESSAGES.add(event.message.id)
 
-    # CHECK KARO: Kya yeh post hamare target source channel (LootsVault/megadealv1) se aayi hai?
-    is_target_source = False
-    
-    # Telegram forward header check karein
-    if event.message.fwd_from and event.message.fwd_from.from_id:
-        try:
-            # Original channel ki details nikalna
-            fwd_chat = await client.get_entity(event.message.fwd_from.from_id)
-            if fwd_chat and getattr(fwd_chat, 'username', '').lower() == LOGO_ONLY_SOURCE_CHANNEL.lower():
-                is_target_source = True
-        except Exception as e:
-            print(f"⚠️ Forward source check error: {e}")
-
-    # 📝 CASE A: AGAR PURE TEXT HAI YA PHOTO KISI AUR CHANNEL KI HAI (Bina Logo Ke)
-    if not event.message.media or not is_target_source:
-        if not is_target_source and event.message.media:
-            print("⏩ Kisi aur channel ki photo hai. Logo processing SKIP ki gayi.")
+    # 📝 CASE A: AGAR PURE TEXT HAI (Bina Photo Ke)
+    if not event.message.media:
         try:
             updated_text = original_text + MY_BRAND_FOOTER
             await client.edit_message(event.chat_id, event.message.id, updated_text)
-            print("📝 [SUCCESS] Post par normal footer link jod di gayi (No Logo)!\n")
+            print("📝 [SUCCESS] Pure text post par footer link jod di gayi!\n")
         except Exception as e:
-            print(f"❌ Normal edit error: {e}\n")
+            print(f"❌ Text edit karne mein error: {e}\n")
         return
 
-    # 📸 CASE B: AGAR TARGET CHANNEL KI PHOTO HAI (Logo Edit + Re-post)
-    print(f"🎯 MATCH FOUND! {LOGO_ONLY_SOURCE_CHANNEL} ki photo aayi hai. Double logo processing chalu...")
+    # 📸 CASE B: AGAR PHOTO WALA MESSAGE HAI (Ab har photo process hogi!)
+    print("📸 Channel par photo wala post aaya! Triple logo processing chalu...")
     try:
+        # Photo download karo
         photo_path = await event.message.download_media()
         base_img = Image.open(photo_path).convert("RGBA")
         img_w, img_h = base_img.size
 
-        # Top-Left Logo placement
+        # 1️⃣ Top-Left Logo placement
         if os.path.exists("logo.png"):
             logo_img = Image.open("logo.png").convert("RGBA")
             logo_img = logo_img.resize((110, 110)) 
@@ -102,7 +83,7 @@ async def auto_logo_handler(event):
             base_img.paste(logo_img, logo_position, logo_img)
             print("🎨 Top-Left Logo successfully pasted!")
 
-        # Bottom-Center Strip placement
+        # 2️⃣ Bottom-Center Strip placement
         if os.path.exists("footer_strip.png"):
             strip_img = Image.open("footer_strip.png").convert("RGBA")
             strip_w, strip_h = 190, 45
@@ -114,7 +95,21 @@ async def auto_logo_handler(event):
             base_img.paste(strip_img, (strip_x, strip_y), strip_img)
             print("🎨 Bottom Footer Strip successfully pasted!")
 
-        # Save edited image
+        # 3️⃣ Center Solid White + Black Logo placement
+        if os.path.exists("center_watermark.png"):
+            center_w_img = Image.open("center_watermark.png").convert("RGBA")
+            
+            # Photo ke size ke hisab se center watermark ka size (width ka 45%)
+            wm_size = int(img_w * 0.45)
+            center_w_img = center_w_img.resize((wm_size, wm_size))
+            
+            wm_x = int((img_w - wm_size) / 2)
+            wm_y = int((img_h - wm_size) / 2)
+            
+            base_img.paste(center_w_img, (wm_x, wm_y), center_w_img)
+            print("🎨 Center White-Black Watermark successfully pasted!")
+
+        # Save final image
         base_img = base_img.convert("RGB")
         base_img.save("edited_photo.jpg")
         photo_to_send = "edited_photo.jpg"
@@ -123,11 +118,12 @@ async def auto_logo_handler(event):
         await client.delete_messages(event.chat_id, event.message.id)
         print("🗑️ Old post deleted.")
 
-        # Naya branded post bhejdo
+        # Naya customized post bhejdo (Footer link ke sath)
         final_text = original_text + MY_BRAND_FOOTER
+        
         sent_msg = await client.send_file(MY_TARGET_CHANNEL, photo_to_send, caption=final_text)
         PROCESSED_MESSAGES.add(sent_msg.id)
-        print("💥 [SUCCESS] Double watermarked post uploaded successfully!\n")
+        print("💥 [SUCCESS] Triple watermarked post successfully uploaded!\n")
 
         # Safai
         if os.path.exists(photo_path): os.remove(photo_path)
