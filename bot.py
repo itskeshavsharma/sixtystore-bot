@@ -10,12 +10,17 @@ from PIL import Image
 API_ID = int(os.environ.get("API_ID", 1234567))  
 API_HASH = os.environ.get("API_HASH", "placeholder_hash")
 
-SOURCE_CHANNELS = ['megadealv1', 'pocket_tv_mod_app'] 
+# SOURCE_CHANNELS jahan se bot forward karega
+SOURCE_CHANNELS = ['BhramsBots1','megadealv1', 'pocket_tv_mod_app'] 
 CONVERTOR_BOT = 'ekconverter16bot' 
 MY_TARGET_CHANNEL = 'SixtyStore_loot' 
 MY_BRAND_FOOTER = "\n\nJoin for more premium loots ❤️👇\nhttps://t.me/sixtystore_loot"
 
-# 🧠 PRO-LOOP PROTECTION: Jo messages edit ho chuke hain, unki ID yahan save hogi
+# 🎯 JIS CHANNEL KE POST PAR LOGO LAGANA HAI (Username bina @ ke daalein)
+# Agar megadealv1 hi LootsVault ka source hai, toh isko aise hi rehne dein
+LOGO_ONLY_SOURCE_CHANNEL = 'BhramsBots1' 
+
+# 🧠 LOOP PROTECTION TRACKER
 PROCESSED_MESSAGES = set()
 
 # ==========================================
@@ -38,40 +43,53 @@ async def instant_forward_handler(event):
         print(f"❌ Forward karne mein error: {e}\n")
 
 # ------------------------------------------
-# 🎯 STEP 2: DOUBLE LOGO WATERMARKER & RE-POSTER
+# 🎯 STEP 2: LOGO WATERMARKER & RE-POSTER (With Source Check)
 # ------------------------------------------
 @client.on(events.NewMessage(chats=MY_TARGET_CHANNEL))
 async def auto_logo_handler(event):
     if not event.message:
         return
 
-    # 🛑 1. ID CHECK: Agar ye message humne pehle process kiya hai toh turant ruk jao
+    # 🛑 1. ID CHECK: Loop protection
     if event.message.id in PROCESSED_MESSAGES:
         return
 
     original_text = event.message.message or ""
     
-    # 🛑 2. TEXT CHECK: Agar footer pehle se maujood hai toh bhi ruk jao
+    # 🛑 2. TEXT CHECK: Duplicate protection
     if "https://t.me/sixtystore_loot" in original_text:
         return
 
-    # Message ID ko processed list mein daal do taaki loop na bane
     PROCESSED_MESSAGES.add(event.message.id)
 
-    # 📝 CASE A: AGAR PURE TEXT MESSAGE HAI (Bina Photo Ke)
-    if not event.message.media:
+    # CHECK KARO: Kya yeh post hamare target source channel (LootsVault/megadealv1) se aayi hai?
+    is_target_source = False
+    
+    # Telegram forward header check karein
+    if event.message.fwd_from and event.message.fwd_from.from_id:
+        try:
+            # Original channel ki details nikalna
+            fwd_chat = await client.get_entity(event.message.fwd_from.from_id)
+            if fwd_chat and getattr(fwd_chat, 'username', '').lower() == LOGO_ONLY_SOURCE_CHANNEL.lower():
+                is_target_source = True
+        except Exception as e:
+            print(f"⚠️ Forward source check error: {e}")
+
+    # 📝 CASE A: AGAR PURE TEXT HAI YA PHOTO KISI AUR CHANNEL KI HAI (Bina Logo Ke)
+    if not event.message.media or not is_target_source:
+        if not is_target_source and event.message.media:
+            print("⏩ Kisi aur channel ki photo hai. Logo processing SKIP ki gayi.")
         try:
             updated_text = original_text + MY_BRAND_FOOTER
             await client.edit_message(event.chat_id, event.message.id, updated_text)
-            print("📝 [SUCCESS] Pure text post par footer link jod di gayi!\n")
+            print("📝 [SUCCESS] Post par normal footer link jod di gayi (No Logo)!\n")
         except Exception as e:
-            print(f"❌ Text edit karne mein error: {e}\n")
+            print(f"❌ Normal edit error: {e}\n")
         return
 
-    # 📸 CASE B: AGAR PHOTO WALA MESSAGE HAI
-    print("📸 Channel par photo wala post aaya! Double logo processing chalu...")
+    # 📸 CASE B: AGAR TARGET CHANNEL KI PHOTO HAI (Logo Edit + Re-post)
+    print(f"🎯 MATCH FOUND! {LOGO_ONLY_SOURCE_CHANNEL} ki photo aayi hai. Double logo processing chalu...")
     try:
-        # Photo download karo
         photo_path = await event.message.download_media()
         base_img = Image.open(photo_path).convert("RGBA")
         img_w, img_h = base_img.size
@@ -105,13 +123,11 @@ async def auto_logo_handler(event):
         await client.delete_messages(event.chat_id, event.message.id)
         print("🗑️ Old post deleted.")
 
-        # Naya customized post bhejdo (Footer link ke sath)
+        # Naya branded post bhejdo
         final_text = original_text + MY_BRAND_FOOTER
-        
-        # Naya message send karte waqt use processed mein add karenge taaki delete loop na bane
         sent_msg = await client.send_file(MY_TARGET_CHANNEL, photo_to_send, caption=final_text)
         PROCESSED_MESSAGES.add(sent_msg.id)
-        print("💥 [SUCCESS] Double watermarked post successfully uploaded!\n")
+        print("💥 [SUCCESS] Double watermarked post uploaded successfully!\n")
 
         # Safai
         if os.path.exists(photo_path): os.remove(photo_path)
@@ -141,4 +157,4 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 client.start()
-client.run_until_disconnected()
+client.run_disconnected()
